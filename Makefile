@@ -15,16 +15,16 @@ DISK_IMG_PGM = write_gpt
 QEMU_SCRIPT = qemu.sh
 
 # Uncomment CC/LDFLAGS for gcc
-CC = x86_64-w64-mingw32-gcc 
-LDFLAGS = \
-	-nostdlib \
-	-Wl,--subsystem,10 \
-	-e efi_main 
+# CC = x86_64-w64-mingw32-gcc
+# LDFLAGS = \
+# 	-nostdlib \
+# 	-Wl,--subsystem,10 \
+# 	-e efi_main
 
 # Uncomment CC/LDFLAGS for clang
-#CC = clang \
+CC = clang \
 	-target x86_64-unknown-windows 
-#LDFLAGS = \
+LDFLAGS = \
 	-target x86_64-unknown-windows \
 	-nostdlib \
 	-fuse-ld=lld-link \
@@ -38,7 +38,8 @@ CFLAGS = \
 	-Wextra \
 	-Wpedantic \
 	-mno-red-zone \
-	-ffreestanding 
+	-ffreestanding \
+	-ggdb
 
 all: $(TARGET)
 	cd UEFI-GPT-image-creator/; \
@@ -46,7 +47,7 @@ all: $(TARGET)
 	./$(QEMU_SCRIPT)
 
 $(TARGET): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 	cp $(TARGET) UEFI-GPT-image-creator
 
 -include $(DEPENDS)

@@ -446,8 +446,8 @@ VOID EFIAPI print_datetime(IN EFI_EVENT event, IN VOID *Context) {
     UINT32 save_col = cout->Mode->CursorColumn, save_row = cout->Mode->CursorRow;
 
     // Get current date/time
-    EFI_TIME time = {0};
-    EFI_TIME_CAPABILITIES capabilities = {0};
+    EFI_TIME time;
+    EFI_TIME_CAPABILITIES capabilities;
     rs->GetTime(&time, &capabilities);
 
     // Move cursor to print in lower right corner
@@ -487,6 +487,17 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     // Screen loop
     bool running = true;
     while (running) {
+        EFI_GUID lip_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+        EFI_LOADED_IMAGE_PROTOCOL *lip = NULL;
+        bs->OpenProtocol(image,
+                         &lip_guid,
+                         (VOID **)&lip,
+                         image,
+                         NULL,
+                         EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+        
+        printf(u"%x\r\n", lip->ImageBase);
+        get_key();
         // Menu text on screen
         const CHAR16 *menu_choices[] = {
             u"Set Text Mode",
@@ -515,7 +526,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             UINT32 cols;
         } Timer_Context;
 
-        Timer_Context context = {0};
+        Timer_Context context;
         context.rows = rows;
         context.cols = cols;
 

@@ -71,10 +71,36 @@ typedef UINTN EFI_TPL;
 typedef UINT64 EFI_PHYSICAL_ADDRESS;
 typedef UINT64 EFI_VIRTUAL_ADDRESS;
 
+// EFI_MEMORY_TYPE: UEFI Spec 2.10 section 7.2.1
+typedef enum {
+    EfiReservedMemoryType,
+    EfiLoaderCode,
+    EfiLoaderData,
+    EfiBootServicesCode,
+    EfiBootServicesData,
+    EfiRuntimeServicesCode,
+    EfiRuntimeServicesData,
+    EfiConventionalMemory,
+    EfiUnusableMemory,
+    EfiACPIReclaimMemory,
+    EfiACPIMemoryNVS,
+    EfiMemoryMappedIO,
+    EfiMemoryMappedIOPortSpace,
+    EfiPalCode,
+    EfiPersistentMemory,
+    EfiUnacceptedMemoryType,
+    EfiMaxMemoryType
+} EFI_MEMORY_TYPE;
+
 // EFI_GUID values - various/misc./NOT all inclusive
 #define EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID \
 {0x9042a9de,0x23dc,0x4a38,\
  0x96,0xfb,{0x7a,0xde,0xd0,0x80,0x51,0x6a}}
+
+
+#define EFI_LOADED_IMAGE_PROTOCOL_GUID \
+{0x5B1B31A1,0x9562,0x11d2,\
+ 0x8E,0x3F,{0x00,0xA0,0xC9,0x69,0x72,0x3B}}
 
 
 // EFI_STATUS Codes - UEFI Spec 2.10 Appendix D
@@ -694,5 +720,32 @@ EFI_STATUS
     IN EFI_HANDLE       ImageHandle,
     IN EFI_SYSTEM_TABLE *SystemTable
 );
+
+// EFI_LOADED_IMAGE_PROTOCOL: UEFI Spec 2.10 section 9.1.1
+#define EFI_LOADED_IMAGE_PROTOCOL_REVISION 0x1000
+
+typedef struct {
+    UINT32           Revision;
+    EFI_HANDLE       ParentHandle;
+    EFI_SYSTEM_TABLE *SystemTable;
+
+    // Source location of the image
+    EFI_HANDLE               DeviceHandle;
+    //EFI_DEVICE_PATH_PROTOCOL *FilePath;
+    void                     *FilePath;
+    VOID                     *Reserved;
+
+    // Image’s load options
+    UINT32 LoadOptionsSize;
+    VOID   *LoadOptions;
+
+    // Location where image was loaded
+    VOID             *ImageBase;
+    UINT64           ImageSize;
+    EFI_MEMORY_TYPE  ImageCodeType;
+    EFI_MEMORY_TYPE  ImageDataType;
+    //EFI_IMAGE_UNLOAD Unload;
+    void            *Unload;
+} EFI_LOADED_IMAGE_PROTOCOL;
 
 #endif
