@@ -11,7 +11,7 @@
 			"targetCreateCommands": [
 				"target create --no-dependents --arch x86_64 ${workspaceRoot}/BOOTX64.EFI --symfile ${workspaceRoot}/BOOTX64.pdb",
 				// https://www.reddit.com/r/osdev/comments/144gojm/help_debugging_uefi_application_with_gdb_in_vs/
-				"target modules load --file BOOTX64.EFI .text 0xE2D9000"
+				"target modules load --file BOOTX64.EFI .text 0xE2D8000"
 			],
 			"processCreateCommands": [
 				"gdb-remote localhost:1234"

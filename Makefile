@@ -1,7 +1,7 @@
 .POSIX:
 .PHONY: all clean
 
-SOURCES = efi.c
+SOURCES = efi.c bmp.c
 OBJS = $(SOURCES:.c=.o)
 DEPENDS = $(OBJS:.o=.d)
 TARGET = BOOTX64.EFI
@@ -11,7 +11,7 @@ TARGET = BOOTX64.EFI
 #QEMU_SCRIPT = qemu.bat
 
 # Uncomment disk image exe & shell script for Linux
-DISK_IMG_PGM = write_gpt
+DISK_IMG_PGM = write_gpt -ae /EFI/BOOT/ ../sprites.bmp
 QEMU_SCRIPT = qemu.sh
 
 # Uncomment CC/LDFLAGS for gcc
@@ -47,7 +47,7 @@ all: $(TARGET)
 	./$(QEMU_SCRIPT)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 	cp $(TARGET) UEFI-GPT-image-creator
 
 -include $(DEPENDS)

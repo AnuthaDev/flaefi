@@ -343,3 +343,72 @@ end:
 
     return result;
 }
+
+
+// ================================
+// CHAR16 strcpy:
+//   Copy src string into dst 
+//   Returns dst
+// ================================
+CHAR16 *strcpy_u16(CHAR16 *dst, CHAR16 *src) {
+    if (!dst) return NULL;
+    if (!src) return dst;
+
+    CHAR16 *result = dst;
+    while (*src) *dst++ = *src++;
+
+    *dst = u'\0';   // Null terminate
+
+    return result;
+}
+
+// ================================
+// CHAR16 strncmp:
+//   Compare 2 strings, each character, up to at most len bytes
+//   Returns difference in strings at last point of comparison:
+//   0 if strings are equal, <0 if s2 is greater, >0 if s1 is greater
+// ================================
+INTN strncmp_u16(CHAR16 *s1, CHAR16 *s2, UINTN len) {
+    if (len == 0) return 0;
+
+    while (len > 0 && *s1 && *s2 && *s1 == *s2) {
+        s1++;
+        s2++;
+        len--;
+    }
+
+    return *s1 - *s2;
+}
+
+// ================================
+// CHAR16 strrchr:
+//   Return last occurrence of C in string
+// ================================
+CHAR16 *strrchr_u16(CHAR16 *str, CHAR16 c) {
+    CHAR16 *result = NULL;
+
+    while (*str) {
+        if (*str == c) result = str;
+        str++;
+    }
+
+    return result;
+}
+
+// ================================
+// CHAR16 strcat:
+//   Concatenate src string onto the end of dst string, at
+//   dst's original null terminator position.
+//  Returns dst
+// ================================
+CHAR16 *strcat_u16(CHAR16 *dst, CHAR16 *src) {
+    CHAR16 *s = dst;
+
+    while (*s) s++; // Go until null terminator
+
+    while (*src) *s++ = *src++;
+
+    *s = u'\0'; // I guess this isn't normal libc behavior? But seems better to null terminate
+
+    return dst; 
+}
