@@ -385,7 +385,46 @@ EFI_STATUS set_graphics_mode(void) {
 // Test mouse & cursor support with Simple Pointer Protocol (SPP)
 // ===============================================================
 EFI_STATUS test_flaefi(void) {
-    
+    cout->ClearScreen(cout);
+
+    EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID; 
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
+    bs->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
+
+
+    EFI_EVENT timer_event;
+
+    // Create timer event, to print date/time on screen every ~1second
+    bs->CreateEvent(EVT_TIMER,
+                    0,
+                    NULL,
+                    NULL,
+                    &timer_event);
+
+    // Set Timer for the timer event to run every 1/60 second (in 100ns units)
+    bs->SetTimer(timer_event, TimerPeriodic, 10000000/60);
+
+    EFI_EVENT events[1];
+
+    events[0] = timer_event;
+    UINTN index = 0;
+    UINT32 val = 0;
+
+    while (val < 1000)
+    {
+        EFI_GRAPHICS_OUTPUT_BLT_PIXEL px = {val & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF, 0x00}; // BGR_8888
+
+        bs->WaitForEvent(1, events, &index);
+        gop->Blt(gop, &px, EfiBltVideoFill,
+                 0, 0, // Origin BLT BUFFER X,Y
+                 0, 0, // Destination screen X,Y
+                 100, 100,
+                 0);
+        printf(u"\r%x", val);
+        val++;
+
+    }
+
     return EFI_DEVICE_ERROR;
 }
 
@@ -482,15 +521,15 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 
         EFI_EVENT timer_event;
 
-        // Create timer event, to print date/time on screen every ~1second
-        bs->CreateEvent(EVT_TIMER | EVT_NOTIFY_SIGNAL,
-                        TPL_CALLBACK, 
-                        print_datetime,
-                        (VOID *)&context,
-                        &timer_event);
+        // // Create timer event, to print date/time on screen every ~1second
+        // bs->CreateEvent(EVT_TIMER | EVT_NOTIFY_SIGNAL,
+        //                 TPL_CALLBACK, 
+        //                 print_datetime,
+        //                 (VOID *)&context,
+        //                 &timer_event);
 
-        // Set Timer for the timer event to run every 1 second (in 100ns units)
-        bs->SetTimer(timer_event, TimerPeriodic, 10000000);
+        // // Set Timer for the timer event to run every 1 second (in 100ns units)
+        // bs->SetTimer(timer_event, TimerPeriodic, 10000000);
 
         // Print keybinds at bottom of screen
         cout->SetCursorPosition(cout, 0, rows-3);
