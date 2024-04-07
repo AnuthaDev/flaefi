@@ -490,20 +490,22 @@ EFI_STATUS read_esp_files(void) {
     }
     BMPImage *img = read_bmp(efp);
 
+    const int width = img->header.width_px;
+    const int height = img->header.height_px;
+
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *pixelarr;
-    status = bs->AllocatePool(EfiLoaderData, 513024*4, &pixelarr);
-    for (int i = 0, j=0; i < 513024; i++, j+=3)
+    status = bs->AllocatePool(EfiLoaderData, height * width *4, &pixelarr);
+    for (int i = 0; i < height; i++)
     {
-        if(i % 1002 == 0){
-            j+=2;
+        for (int j = 0; j < width; j++)
+        {
+            pixelarr[width*i + j].Blue = img->data[(width*3+2)*(height-i) + 3*j];
+            pixelarr[width*i + j].Green = img->data[(width*3+2)*(height-i) + 3*j + 1];
+            pixelarr[width*i + j].Red = img->data[(width*3+2)*(height-i) + 3*j + 2];
         }
-        pixelarr[i].Red = img->data[j];
-        pixelarr[i].Blue = img->data[j+1];
-        pixelarr[i].Green = img->data[j+2];
-        pixelarr[i].Reserved = 0;
+        
     }
     
-
 
     EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID; 
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
@@ -511,23 +513,46 @@ EFI_STATUS read_esp_files(void) {
 
 
 
+    EFI_EVENT timer_event;
+
+    // Create timer event, to print date/time on screen every ~1second
+    bs->CreateEvent(EVT_TIMER,
+                    0,
+                    NULL,
+                    NULL,
+                    &timer_event);
+
+    // Set Timer for the timer event to run every 1/60 second (in 100ns units)
+    bs->SetTimer(timer_event, TimerPeriodic, 10000000/60);
+
+    EFI_EVENT events[1];
+
+    events[0] = timer_event;
+    UINTN index = 0;
+loopy:
+    UINT32 val = 0;
+
+    while (val < 1000)
+    {
+                 bs->WaitForEvent(1, events, &index);
 
     gop->Blt(gop, pixelarr, EfiBltBufferToVideo,
                  0, 0, // Origin BLT BUFFER X,Y
-                 0, 0, // Destination screen X,Y
-                 1002, 512,
+                 val/2, val/2, // Destination screen X,Y
+                 width, height,
                  0);
+        printf(u"\r%x", val);
+        val++;
 
-
-
-while (1);
-
-
-
-
-
-
-
+    }
+get_key();
+        EFI_GRAPHICS_OUTPUT_BLT_PIXEL px = { 0x00, 0x00, 0x00, 0x01 };  // BGR_8888
+        gop->Blt(gop, &px, EfiBltVideoFill, 
+                    0, 0,  // Origin BLT BUFFER X,Y
+                    0, 0,  // Destination screen X,Y
+                    1920, 1080,
+                    0);
+goto loopy;
 
 
 

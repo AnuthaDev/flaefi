@@ -15,12 +15,12 @@
 
 extern EFI_BOOT_SERVICES    *bs;   // Boot services
 
-void free_bmp(BMPImage *image);
-int _get_image_size_bytes(BMPHeader *bmp_header);
-int _get_image_row_size_bytes(BMPHeader *bmp_header);
-int _get_bytes_per_pixel(BMPHeader  *bmp_header);
-int _get_padding(BMPHeader *bmp_header);
-int _get_position_x_row(int x, BMPHeader *bmp_header);
+VOID free_bmp(BMPImage *image);
+INT32 _get_image_size_bytes(BMPHeader *bmp_header);
+INT32 _get_image_row_size_bytes(BMPHeader *bmp_header);
+INT32 _get_bytes_per_pixel(BMPHeader  *bmp_header);
+INT32 _get_padding(BMPHeader *bmp_header);
+INT32 _get_position_x_row(INT32 x, BMPHeader *bmp_header);
 
 /*
  * Read a BMP image from an already open file.
@@ -81,7 +81,7 @@ BMPImage *read_bmp(EFI_FILE_PROTOCOL *efp)
  * 
  * Return: true if and only if the given BMPHeader is valid.
  */
-bool check_bmp_header(BMPHeader* bmp_header, EFI_FILE_PROTOCOL *efp)
+BOOLEAN check_bmp_header(BMPHeader* bmp_header, EFI_FILE_PROTOCOL *efp)
 {
     /*
     A header is valid if:
@@ -109,81 +109,11 @@ bool check_bmp_header(BMPHeader* bmp_header, EFI_FILE_PROTOCOL *efp)
 /*
  * Free all memory referred to by the given BMPImage.
  */
-void free_bmp(BMPImage *image)
+VOID free_bmp(BMPImage *image)
 {
     bs->FreePool(image->data);
     bs->FreePool(image);
 }
-
-// /*
-//  * Create a new image containing the cropped portion of the given image.
-//  * 
-//  * - Params:
-//  *       x - the start index, from the left edge of the input image.
-//  *       y - the start index, from the top edge of the input image.
-//  *       w - the width of the new image.
-//  *       h - the height of the new image.
-//  * 
-//  * - Postcondition: it is the caller's responsibility to free the memory
-//  *   for the error message and the returned image.
-//  * 
-//  * - Return: the cropped image as a BMPImage on the heap.
-//  */
-// BMPImage *crop_bmp(BMPImage *image, int x, int y, int w, int h, char **error)
-// {
-//     BMPImage *new_image = malloc(sizeof(*new_image));
-//     // Check size of cropedd image is less or equal than the size of original image
-//     if (!_check
-//             (
-//                 x + w <= image->header.width_px && y + h <= image->header.height_px,
-//                 error,
-//                 "The size of the new image should be equal or less than the size of the original")
-//             )
-//     {
-//         return NULL;
-//     }
-//     // Update new_image header
-//     new_image->header = image->header;
-//     new_image->header.width_px = w;
-//     new_image->header.height_px = h;
-//     new_image->header.image_size_bytes = _get_image_size_bytes(&new_image->header);
-//     new_image->header.size = BMP_HEADER_SIZE + new_image->header.image_size_bytes;
-//     // Allocate memory for image data
-//     new_image->data = malloc(sizeof(*new_image->data) * new_image->header.image_size_bytes);
-//     if(!_check(new_image->data != NULL, error, "Not enough memory"))
-//     {
-//         return NULL;
-//     }
-//     int position_y = y * _get_image_row_size_bytes(&image->header);
-//     int position_x_row = _get_position_x_row(x, &image->header);
-//     int new_index = 0;
-//     // Iterate image's columns
-//     for (int i = 0; i < h; i++)
-//     {
-//         // Iterate image's rows
-//         for (int j = 0; j < w; j++)
-//         {
-//             // Iterate image's pixels
-//             for(int k = 0; k < 3; k++)
-//             {              
-//                 new_image->data[new_index] = image->data[position_y + position_x_row];
-//                 new_index++;
-//                 position_x_row++;
-//             }
-//         }
-//         // Add padding to new_image
-//         int padding = _get_padding(&new_image->header);
-//         for (int l = 0; l < padding; l++)
-//         {  
-//             new_image->data[new_index] = 0x00;
-//             new_index++;
-//         }
-//         position_y += _get_image_row_size_bytes(&image->header);
-//         position_x_row = _get_position_x_row(x, &image->header);
-//     }
-
-//     return new_image;
-// }
 
 /* 
  * Return the size of the file.
@@ -203,7 +133,7 @@ void free_bmp(BMPImage *image)
 /* 
  * Return the size of the image in bytes.
  */
-int _get_image_size_bytes(BMPHeader *bmp_header)
+INT32 _get_image_size_bytes(BMPHeader *bmp_header)
 {
     return _get_image_row_size_bytes(bmp_header) * bmp_header->height_px;
 }
@@ -213,16 +143,16 @@ int _get_image_size_bytes(BMPHeader *bmp_header)
  *  
  * - Precondition: the header must have the width of the image in pixels.
  */
-int _get_image_row_size_bytes(BMPHeader *bmp_header)
+INT32 _get_image_row_size_bytes(BMPHeader *bmp_header)
 {
-    int bytes_per_row_without_padding = bmp_header->width_px * _get_bytes_per_pixel(bmp_header);
+    INT32 bytes_per_row_without_padding = bmp_header->width_px * _get_bytes_per_pixel(bmp_header);
     return bytes_per_row_without_padding + _get_padding(bmp_header);
 }
 
 /*
  * Return size of padding in bytes.
  */ 
-int _get_padding(BMPHeader *bmp_header)
+INT32 _get_padding(BMPHeader *bmp_header)
 {
     return (4 - (bmp_header->width_px * _get_bytes_per_pixel(bmp_header)) % 4) % 4;
 }
@@ -233,7 +163,7 @@ int _get_padding(BMPHeader *bmp_header)
  * Precondition:
  *     - the header must have the number of bits per pixel.
  */
-int _get_bytes_per_pixel(BMPHeader  *bmp_header)
+INT32 _get_bytes_per_pixel(BMPHeader  *bmp_header)
 {
     return bmp_header->bits_per_pixel / BITS_PER_BYTE;
 }
@@ -241,7 +171,7 @@ int _get_bytes_per_pixel(BMPHeader  *bmp_header)
 /*
  * Return the position of the pixel x from the beginning of a row.
  */ 
-int _get_position_x_row(int x, BMPHeader *bmp_header)
+INT32 _get_position_x_row(INT32 x, BMPHeader *bmp_header)
 {
     return x * _get_bytes_per_pixel(bmp_header);
 }
