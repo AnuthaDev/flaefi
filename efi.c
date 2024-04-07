@@ -429,6 +429,28 @@ EFI_STATUS test_flaefi(void) {
     return EFI_DEVICE_ERROR;
 }
 
+
+VOID copy_buf_mask(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *dest,
+                  int source_x_offset, int source_y_offset, int dest_x_offset, int dest_y_offset,
+                  int source_pitch, int dest_pitch, int width, int height, EFI_GRAPHICS_OUTPUT_BLT_PIXEL mask)
+{
+    for (int i = source_y_offset; i < source_y_offset + height; i++)
+    {
+        for (int j = source_x_offset; j < source_x_offset + width; j++)
+        {
+            EFI_GRAPHICS_OUTPUT_BLT_PIXEL val = source[source_pitch * i + j];
+            if (val.Red == mask.Red && val.Blue == mask.Blue && val.Green == mask.Green)
+            {
+                continue;
+            }
+            else
+            {
+                dest[(i - source_y_offset + dest_y_offset) * dest_pitch + (j - source_x_offset + dest_x_offset)] = val;
+            }
+        }
+    }
+}
+
 // ================================================
 // Read & print files in the EFI System Partition
 // ================================================
@@ -493,18 +515,20 @@ EFI_STATUS read_esp_files(void) {
     const int width = img->header.width_px;
     const int height = img->header.height_px;
 
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *pixelarr;
-    status = bs->AllocatePool(EfiLoaderData, height * width *4, &pixelarr);
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *asset_arr;
+    status = bs->AllocatePool(EfiLoaderData, height * width *4, &asset_arr);
     for (int i = 0; i < height; i++)
     {
         for (int j = 0; j < width; j++)
         {
-            pixelarr[width*i + j].Blue = img->data[(width*3+2)*(height-i) + 3*j];
-            pixelarr[width*i + j].Green = img->data[(width*3+2)*(height-i) + 3*j + 1];
-            pixelarr[width*i + j].Red = img->data[(width*3+2)*(height-i) + 3*j + 2];
+            asset_arr[width*i + j].Blue = img->data[(width*3+2)*(height-i-1) + 3*j];
+            asset_arr[width*i + j].Green = img->data[(width*3+2)*(height-i-1) + 3*j + 1];
+            asset_arr[width*i + j].Red = img->data[(width*3+2)*(height-i-1) + 3*j + 2];
         }
         
     }
+
+    free_bmp(img);
     
 
     EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID; 
@@ -529,20 +553,40 @@ EFI_STATUS read_esp_files(void) {
 
     events[0] = timer_event;
     UINTN index = 0;
+    
+    int tw = 576;
+    int th = 512;
+    int xoff = 0;
+    int yoff = 0;
+
+
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *framebuffer;
+    status = bs->AllocatePool(EfiLoaderData, tw*th *4, &framebuffer);
+
+    // copyarr_mask(pixelarr, framebuffer, )
+
+    
 loopy:
     UINT32 val = 0;
 
-    while (val < 1000)
+    while (val < 500)
     {
                  bs->WaitForEvent(1, events, &index);
+    copy_buf_mask(asset_arr, framebuffer, xoff, yoff,0,0,width, tw, tw, th, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL) {0xff, 0x00, 0xff, 0x00});
+    int btw = 34;
+    int bth = 32;
+    int bxoff = 816;
+    int byoff = 180;
+    copy_buf_mask(asset_arr, framebuffer, bxoff, byoff,val%500,100,width, tw, btw, bth, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL) {0xff, 0x00, 0xff, 0x00});
 
-    gop->Blt(gop, pixelarr, EfiBltBufferToVideo,
+    gop->Blt(gop, framebuffer, EfiBltBufferToVideo,
                  0, 0, // Origin BLT BUFFER X,Y
-                 val/2, val/2, // Destination screen X,Y
-                 width, height,
+                 100, 200, // Destination screen X,Y
+                 tw, th,
                  0);
-        printf(u"\r%x", val);
+        //printf(u"\r%x", val);
         val++;
+
 
     }
 get_key();
