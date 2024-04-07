@@ -565,28 +565,39 @@ EFI_STATUS read_esp_files(void) {
 
     // copyarr_mask(pixelarr, framebuffer, )
 
-    
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *doublebuffer;
+    status = bs->AllocatePool(EfiLoaderData, tw*th*4 *4, &doublebuffer);
+
 loopy:
     UINT32 val = 0;
 
     while (val < 500)
     {
-                 bs->WaitForEvent(1, events, &index);
+    bs->WaitForEvent(1, events, &index);
     copy_buf_mask(asset_arr, framebuffer, xoff, yoff,0,0,width, tw, tw, th, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL) {0xff, 0x00, 0xff, 0x00});
     int btw = 34;
     int bth = 32;
     int bxoff = 816;
     int byoff = 180;
     copy_buf_mask(asset_arr, framebuffer, bxoff, byoff,val%500,100,width, tw, btw, bth, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL) {0xff, 0x00, 0xff, 0x00});
+    
+    for (int i = 0; i < th*2; i++)
+    {
+        for (int j = 0; j < tw*2; j++)
+        {
+            doublebuffer[tw*2*i + j] = framebuffer[tw*(i/2) + j/2];
+        }
+        
+    }
+    
 
-    gop->Blt(gop, framebuffer, EfiBltBufferToVideo,
+    gop->Blt(gop, doublebuffer, EfiBltBufferToVideo,
                  0, 0, // Origin BLT BUFFER X,Y
-                 100, 200, // Destination screen X,Y
-                 tw, th,
+                 0, 0, // Destination screen X,Y
+                 tw*2, th*2,
                  0);
         //printf(u"\r%x", val);
         val++;
-
 
     }
 get_key();
