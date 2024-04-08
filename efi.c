@@ -384,7 +384,7 @@ EFI_STATUS set_graphics_mode(void) {
 
 VOID copy_buf_mask(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *dest,
                   int source_x_offset, int source_y_offset, int dest_x_offset, int dest_y_offset,
-                  int source_pitch, int dest_pitch, int width, int height, EFI_GRAPHICS_OUTPUT_BLT_PIXEL mask)
+                  int source_pitch, int dest_pitch,int dest_height, int width, int height, EFI_GRAPHICS_OUTPUT_BLT_PIXEL mask)
 {
     for (int i = source_y_offset; i < source_y_offset + height; i++)
     {
@@ -397,7 +397,14 @@ VOID copy_buf_mask(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, EFI_GRAPHICS_OUTPUT_BL
             }
             else
             {
-                dest[(i - source_y_offset + dest_y_offset) * dest_pitch + (j - source_x_offset + dest_x_offset)] = val;
+                UINT32 yidx = i - source_y_offset + dest_y_offset;
+                UINT32 xidx = j - source_x_offset + dest_x_offset;
+
+                if(xidx>= dest_pitch || yidx>=dest_height){
+                    continue;
+                }
+                int index = yidx * dest_pitch + xidx;
+                dest[index] = val;
             }
         }
     }
@@ -501,10 +508,17 @@ EFI_STATUS test_flaefi(void) {
     // Set Timer for the timer event to run every 1/60 second (in 100ns units)
     bs->SetTimer(timer_event, TimerPeriodic, 10000000/60);
 
-    EFI_EVENT events[1];
+    EFI_EVENT events[2];
 
-    events[0] = timer_event;
+    events[1] = timer_event;
     UINTN index = 0;
+
+    EFI_INPUT_KEY key;
+
+    events[0] = cin->WaitForKey;
+
+
+
     
     int tw = 576;
     int th = 512;
@@ -520,50 +534,77 @@ EFI_STATUS test_flaefi(void) {
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *doublebuffer;
     status = bs->AllocatePool(EfiLoaderData, tw*th*4 *4, &doublebuffer);
 
-loopy:
-    UINT32 val = 0;
-
-    while (val < 500)
+    UINT32 counter = 0;
+    int speed = 5;
+    int birdyoff = 200;
+    int pilxoff = 570;
+    int pilspeed = 1;
+    while (1)
     {
-    bs->WaitForEvent(1, events, &index);
-    copy_buf_mask(asset_arr, framebuffer, xoff, yoff,0,0,width, tw, tw, th, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL) {0xff, 0x00, 0xff, 0x00});
-    int btw = 34;
-    int bth = 32;
-    int bxoff = 816;
-    int byoff = 180;
-    copy_buf_mask(asset_arr, framebuffer, bxoff, byoff,val%500,100,width, tw, btw, bth, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL) {0xff, 0x00, 0xff, 0x00});
-    
-    for (int i = 0; i < th*2; i++)
-    {
-        for (int j = 0; j < tw*2; j++)
+        bs->WaitForEvent(2, events, &index);
+        if (index == 0)
         {
-            doublebuffer[tw*2*i + j] = framebuffer[tw*(i/2) + j/2];
+            cin->ReadKeyStroke(cin, &key);
+            if (speed >= 0)
+            {
+                speed = -3;
+            }
+            else if (speed > -10)
+            {
+                speed -= 3;
+            }
         }
+        else
+        {
+            copy_buf_mask(asset_arr, framebuffer, xoff, yoff, 0, 0, width, tw,th, tw, th, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
+            
+            int upw = 52;
+            int uph = 242;
+            int upxoff = 948;
+            int upyoff = 0;
+
+            copy_buf_mask(asset_arr, framebuffer, upxoff, upyoff, pilxoff-pilspeed, 350, width, tw,th, upw, uph, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
         
+            int dpw = 52;
+            int dph = 270;
+            int dpxoff = 892;
+            int dpyoff = 0;
+
+            copy_buf_mask(asset_arr, framebuffer, dpxoff, dpyoff, pilxoff-pilspeed,0, width, tw,th, dpw, dph, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
+            pilxoff -= pilspeed;
+            if(pilxoff + dpw-6<0){
+                pilxoff = 570;
+            }
+            int btw = 34;
+            int bth = 32;
+            int bxoff = 816;
+            int byoff = 180;
+            copy_buf_mask(asset_arr, framebuffer, bxoff, byoff, tw / 2 - btw / 2, birdyoff + speed, width, tw, th, btw, bth, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
+            birdyoff += speed;
+        
+            if (speed < 10 && counter++ == 4)
+            {
+                speed++;
+                counter = 0;
+            }
+
+            for (int i = 0; i < th * 2; i++)
+            {
+                for (int j = 0; j < tw * 2; j++)
+                {
+                    doublebuffer[tw * 2 * i + j] = framebuffer[tw * (i / 2) + j / 2];
+                }
+            }
+
+            gop->Blt(gop, doublebuffer, EfiBltBufferToVideo,
+                     0, 0, // Origin BLT BUFFER X,Y
+                     0, 0, // Destination screen X,Y
+                     tw * 2, th * 2,
+                     0);
+        }
     }
-    
 
-    gop->Blt(gop, doublebuffer, EfiBltBufferToVideo,
-                 0, 0, // Origin BLT BUFFER X,Y
-                 0, 0, // Destination screen X,Y
-                 tw*2, th*2,
-                 0);
-        //printf(u"\r%x", val);
-        val++;
-
-    }
-get_key();
-        EFI_GRAPHICS_OUTPUT_BLT_PIXEL px = { 0x00, 0x00, 0x00, 0x01 };  // BGR_8888
-        gop->Blt(gop, &px, EfiBltVideoFill, 
-                    0, 0,  // Origin BLT BUFFER X,Y
-                    0, 0,  // Destination screen X,Y
-                    1920, 1080,
-                    0);
-goto loopy;
-
-
-
-    cleanup:
+cleanup:
     // Close open protocols
     bs->CloseProtocol(lip->DeviceHandle,
                       &sfsp_guid,

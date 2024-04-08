@@ -39,6 +39,7 @@ CFLAGS = \
 	-Wpedantic \
 	-mno-red-zone \
 	-ffreestanding \
+	-O2 \
 	-ggdb
 
 all: $(TARGET)
