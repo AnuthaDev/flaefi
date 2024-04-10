@@ -548,9 +548,17 @@ EFI_STATUS test_flaefi(void) {
     status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height*4 *4, &doublebuffer);
 
 
+    Sprite bird_1 = sprites[ASSET_BIRD_1];
+    load_asset_image(asset_arr,width, &bird_1);
 
-    Sprite bird = sprites[ASSET_BIRD];
-    load_asset_image(asset_arr,width, &bird);
+    Sprite bird_2 = sprites[ASSET_BIRD_2];
+    load_asset_image(asset_arr,width, &bird_2);
+
+    Sprite bird_3 = sprites[ASSET_BIRD_3];
+    load_asset_image(asset_arr,width, &bird_3);
+
+    Sprite bird = sprites[ASSET_BIRD_1];
+    bird.image = bird_1.image;
 
     Sprite background = sprites[ASSET_BG];
     load_asset_image(asset_arr,width, &background);
@@ -586,6 +594,7 @@ EFI_STATUS test_flaefi(void) {
     game_over.y_pos = 50;
 
     int parity = 1;
+
 
     while (1)
     {
@@ -660,6 +669,8 @@ EFI_STATUS test_flaefi(void) {
     UINT32 counter = 0;
     int speed = -3;
     int pilspeed = 1;
+
+    int bird_selector = 0;
     while (1)
     {
         bs->WaitForEvent(2, events, &index);
@@ -687,7 +698,6 @@ EFI_STATUS test_flaefi(void) {
             copy_sprite_mask(&background, framebuffer, fb_width, fb_height, MAGENTA_MASK);
             copy_sprite_mask(&pipe_up, framebuffer, fb_width, fb_height, MAGENTA_MASK);
             copy_sprite_mask(&pipe_down, framebuffer, fb_width, fb_height, MAGENTA_MASK);
-
 
 
             copy_sprite_mask(&bird, framebuffer, fb_width, fb_height, MAGENTA_MASK);
@@ -742,6 +752,24 @@ EFI_STATUS test_flaefi(void) {
                 speed++;
                 counter = 0;
             }
+
+
+            if (bird_selector < 20)
+            {
+                bird.image = bird_2.image;
+            }
+            else if (bird_selector < 40)
+            {
+                bird.image = bird_1.image;
+            }
+            else if (bird_selector < 60)
+            {
+                bird.image = bird_3.image;
+            }else{
+                bird_selector = 0;
+            }
+            
+            bird_selector++;
 
 
         }
