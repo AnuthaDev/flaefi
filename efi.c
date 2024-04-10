@@ -16,13 +16,8 @@
 #define SCANCODE_ESC        0x17
 
 
-
-// EFI_GRAPHICS_OUTPUT_BLT_PIXEL values, BGRr8888
-#define px_LGRAY {0xEE,0xEE,0xEE,0x00}
-#define px_BLACK {0x00,0x00,0x00,0x00}
-#define px_BLUE  {0x98,0x00,0x00,0x00}  // EFI_BLUE
-
 #define MAGENTA_MASK 0xFFFF00FF
+
 // -----------------
 // Global variables
 // -----------------
@@ -34,18 +29,6 @@ EFI_RUNTIME_SERVICES *rs;   // Runtime services
 EFI_HANDLE image = NULL;    // Image handle
 
 extern Sprite sprites[];
-
-// Mouse cursor buffer 8x8
-EFI_GRAPHICS_OUTPUT_BLT_PIXEL cursor_buffer[] = {
-    px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, // Line 1
-    px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, // Line 2
-    px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_BLUE, px_BLUE, px_BLUE, px_BLUE,     // Line 3
-    px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_LGRAY, px_BLUE, px_BLUE, px_BLUE,    // Line 4
-    px_LGRAY, px_LGRAY, px_BLUE, px_LGRAY, px_LGRAY, px_LGRAY, px_BLUE, px_BLUE,    // Line 5
-    px_LGRAY, px_LGRAY, px_BLUE, px_BLUE, px_LGRAY, px_LGRAY, px_LGRAY, px_BLUE,    // Line 6
-    px_LGRAY, px_LGRAY, px_BLUE, px_BLUE, px_BLUE, px_LGRAY, px_LGRAY, px_LGRAY,    // Line 7
-    px_LGRAY, px_LGRAY, px_BLUE, px_BLUE, px_BLUE, px_BLUE, px_LGRAY, px_LGRAY,     // Line 8
-};
 
 
 // ====================
@@ -368,7 +351,7 @@ EFI_STATUS set_graphics_mode(void) {
                         gop->QueryMode(gop, mode_index, &mode_info_size, &mode_info);
 
                         // Clear GOP screen - EFI_BLUE seems to have a hex value of 0x98
-                        EFI_GRAPHICS_OUTPUT_BLT_PIXEL px = { 0x98, 0x00, 0x00, 0x00 };  // BGR_8888
+                        EFI_GRAPHICS_OUTPUT_BLT_PIXEL px = { 0x00, 0x00, 0x00, 0x00 };  // BGR_8888
                         gop->Blt(gop, &px, EfiBltVideoFill, 
                                  0, 0,  // Origin BLT BUFFER X,Y
                                  0, 0,  // Destination screen X,Y
@@ -399,12 +382,11 @@ VOID copy_sprite_mask(Sprite *sprite, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *dest, UINT3
                 UINT32 yidx = i + sprite->y_pos;
                 UINT32 xidx = j + sprite->x_pos;
 
-                if (xidx >= dest_pitch || yidx >= dest_height)
+                if (xidx < dest_pitch && yidx < dest_height)
                 {
-                    continue;
+                    UINT32 index = yidx * dest_pitch + xidx;
+                    dest[index] = val;
                 }
-                UINT32 index = yidx * dest_pitch + xidx;
-                dest[index] = val;
             }
         }
     }
@@ -421,6 +403,7 @@ VOID load_asset_image(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, UINT32 src_pitch, S
         }
     }
 }
+
 // ================================================
 // Test the game
 // ================================================
@@ -532,19 +515,17 @@ EFI_STATUS test_flaefi(void) {
 
 
     
-    int tw = 576;
-    int th = 512;
-    int xoff = 0;
-    int yoff = 0;
+    int fb_width = 576;
+    int fb_height = 512;
 
 
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *framebuffer;
-    status = bs->AllocatePool(EfiLoaderData, tw*th *4, &framebuffer);
+    status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height *4, &framebuffer);
 
     // copyarr_mask(pixelarr, framebuffer, )
 
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *doublebuffer;
-    status = bs->AllocatePool(EfiLoaderData, tw*th*4 *4, &doublebuffer);
+    status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height*4 *4, &doublebuffer);
 
     Sprite bird = sprites[ASSET_BIRD];
     load_asset_image(asset_arr,width, &bird);
@@ -558,9 +539,11 @@ EFI_STATUS test_flaefi(void) {
     Sprite pipe_up = sprites[ASSET_PIPE_UP];
     load_asset_image(asset_arr,width, &pipe_up);
 
+    bs->FreePool(asset_arr);
 
 
-    bird.x_pos = tw/2 - bird.width/2;
+
+    bird.x_pos = fb_width/2 - bird.width/2;
     bird.y_pos = 200;
 
     pipe_down.x_pos = 570;
@@ -588,9 +571,9 @@ EFI_STATUS test_flaefi(void) {
         else
         {
             
-            copy_sprite_mask(&background, framebuffer, tw, th, MAGENTA_MASK);
-            copy_sprite_mask(&pipe_up, framebuffer, tw, th, MAGENTA_MASK);
-            copy_sprite_mask(&pipe_down, framebuffer, tw, th, MAGENTA_MASK);
+            copy_sprite_mask(&background, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            copy_sprite_mask(&pipe_up, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            copy_sprite_mask(&pipe_down, framebuffer, fb_width, fb_height, MAGENTA_MASK);
 
             pipe_up.x_pos -= pilspeed;
             pipe_down.x_pos -= pilspeed;
@@ -599,7 +582,7 @@ EFI_STATUS test_flaefi(void) {
                 pipe_up.x_pos = 570;
             }
 
-            copy_sprite_mask(&bird, framebuffer, tw, th, MAGENTA_MASK);
+            copy_sprite_mask(&bird, framebuffer, fb_width, fb_height, MAGENTA_MASK);
 
             bird.y_pos += speed;
             if (speed < 10 && counter++ == 4)
@@ -608,18 +591,18 @@ EFI_STATUS test_flaefi(void) {
                 counter = 0;
             }
 
-            for (int i = 0; i < th * 2; i++)
+            for (int i = 0; i < fb_height * 2; i++)
             {
-                for (int j = 0; j < tw * 2; j++)
+                for (int j = 0; j < fb_width * 2; j++)
                 {
-                    doublebuffer[tw * 2 * i + j] = framebuffer[tw * (i / 2) + j / 2];
+                    doublebuffer[fb_width * 2 * i + j] = framebuffer[fb_width * (i / 2) + j / 2];
                 }
             }
 
             gop->Blt(gop, doublebuffer, EfiBltBufferToVideo,
                      0, 0, // Origin BLT BUFFER X,Y
                      0, 0, // Destination screen X,Y
-                     tw * 2, th * 2,
+                     fb_width * 2, fb_height * 2,
                      0);
         }
     }
@@ -641,44 +624,6 @@ cleanup:
 }
 
 
-
-// ===========================================================
-// Timer function to print current date/time every 1 second
-// ===========================================================
-VOID EFIAPI print_datetime(IN EFI_EVENT event, IN VOID *Context) {
-    (VOID)event; // Suppress compiler warning
-
-    // Timer context will be the text mode screen bounds
-    typedef struct {
-        UINT32 rows; 
-        UINT32 cols;
-    } Timer_Context;
-
-    Timer_Context context = *(Timer_Context *)Context;
-
-    // Save current cursor position before printing date/time
-    UINT32 save_col = cout->Mode->CursorColumn, save_row = cout->Mode->CursorRow;
-
-    // Get current date/time
-    EFI_TIME time;
-    EFI_TIME_CAPABILITIES capabilities;
-    rs->GetTime(&time, &capabilities);
-
-    // Move cursor to print in lower right corner
-    cout->SetCursorPosition(cout, context.cols-20, context.rows-1);
-
-    // Print current date/time
-    printf(u"%u-%c%u-%c%u %c%u:%c%u:%c%u",
-            time.Year, 
-            time.Month  < 10 ? u'0' : u'\0', time.Month,
-            time.Day    < 10 ? u'0' : u'\0', time.Day,
-            time.Hour   < 10 ? u'0' : u'\0', time.Hour,
-            time.Minute < 10 ? u'0' : u'\0', time.Minute,
-            time.Second < 10 ? u'0' : u'\0', time.Second);
-
-    // Restore cursor position
-    cout->SetCursorPosition(cout, save_col, save_row);
-}
 
 // ====================
 // Entry Point
@@ -733,28 +678,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         // Get current text mode ColsxRows values
         UINTN cols = 0, rows = 0;
         cout->QueryMode(cout, cout->Mode->Mode, &cols, &rows);
-
-        // Timer context will be the text mode screen bounds
-        typedef struct {
-            UINT32 rows; 
-            UINT32 cols;
-        } Timer_Context;
-
-        Timer_Context context;
-        context.rows = rows;
-        context.cols = cols;
-
-        EFI_EVENT timer_event;
-
-        // // Create timer event, to print date/time on screen every ~1second
-        // bs->CreateEvent(EVT_TIMER | EVT_NOTIFY_SIGNAL,
-        //                 TPL_CALLBACK, 
-        //                 print_datetime,
-        //                 (VOID *)&context,
-        //                 &timer_event);
-
-        // // Set Timer for the timer event to run every 1 second (in 100ns units)
-        // bs->SetTimer(timer_event, TimerPeriodic, 10000000);
 
         // Print keybinds at bottom of screen
         cout->SetCursorPosition(cout, 0, rows-3);
@@ -818,9 +741,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
                     break;
 
                 case SCANCODE_ESC:
-                    // Close Timer Event for cleanup
-                    bs->CloseEvent(timer_event);
-
                     // Escape key: power off
                     rs->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 
