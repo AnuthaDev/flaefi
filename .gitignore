@@ -4,3 +4,4 @@
 *.INF
 *.vhd
 *.pdb
+.vscode/*

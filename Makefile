@@ -1,7 +1,7 @@
 .POSIX:
 .PHONY: all clean
 
-SOURCES = efi.c bmp.c
+SOURCES = efi.c bmp.c assets.c
 OBJS = $(SOURCES:.c=.o)
 DEPENDS = $(OBJS:.o=.d)
 TARGET = BOOTX64.EFI
@@ -39,8 +39,9 @@ CFLAGS = \
 	-Wpedantic \
 	-mno-red-zone \
 	-ffreestanding \
-	-O2 \
-	-ggdb
+	-ggdb \
+	-O2
+
 
 all: $(TARGET)
 	cd UEFI-GPT-image-creator/; \

@@ -174,6 +174,9 @@ EFI_STATUS
     IN UINT32                       ModeNumber
 );
 
+#pragma pack(push)  // save the original data alignment
+#pragma pack(1)     // Set data alignment to 1 byte boundary
+
 // EFI_GRAPHICS_OUTPUT_BLT_PIXEL
 typedef struct {
     UINT8 Blue;
@@ -181,6 +184,9 @@ typedef struct {
     UINT8 Red;
     UINT8 Reserved;
 } EFI_GRAPHICS_OUTPUT_BLT_PIXEL;
+
+#pragma pack(pop)  // restore the previous pack setting
+
 
 // EFI_GRAPHICS_OUTPUT_BLT_OPERATION
 typedef enum {

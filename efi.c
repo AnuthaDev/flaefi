@@ -1,6 +1,7 @@
 #include "ulibc.h"
 #include "efi.h"
 #include "bmp.h"
+#include "assets.h"
 
 // -----------------
 // Global macros
@@ -21,6 +22,7 @@
 #define px_BLACK {0x00,0x00,0x00,0x00}
 #define px_BLUE  {0x98,0x00,0x00,0x00}  // EFI_BLUE
 
+#define MAGENTA_MASK 0xFFFF00FF
 // -----------------
 // Global variables
 // -----------------
@@ -30,6 +32,8 @@ extern EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *cerr;  // Console output - stderr
 EFI_BOOT_SERVICES    *bs;   // Boot services
 EFI_RUNTIME_SERVICES *rs;   // Runtime services
 EFI_HANDLE image = NULL;    // Image handle
+
+extern Sprite sprites[];
 
 // Mouse cursor buffer 8x8
 EFI_GRAPHICS_OUTPUT_BLT_PIXEL cursor_buffer[] = {
@@ -382,34 +386,41 @@ EFI_STATUS set_graphics_mode(void) {
     return EFI_SUCCESS;
 }
 
-VOID copy_buf_mask(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *dest,
-                  int source_x_offset, int source_y_offset, int dest_x_offset, int dest_y_offset,
-                  int source_pitch, int dest_pitch,int dest_height, int width, int height, EFI_GRAPHICS_OUTPUT_BLT_PIXEL mask)
-{
-    for (int i = source_y_offset; i < source_y_offset + height; i++)
-    {
-        for (int j = source_x_offset; j < source_x_offset + width; j++)
-        {
-            EFI_GRAPHICS_OUTPUT_BLT_PIXEL val = source[source_pitch * i + j];
-            if (val.Red == mask.Red && val.Blue == mask.Blue && val.Green == mask.Green)
-            {
-                continue;
-            }
-            else
-            {
-                UINT32 yidx = i - source_y_offset + dest_y_offset;
-                UINT32 xidx = j - source_x_offset + dest_x_offset;
 
-                if(xidx>= dest_pitch || yidx>=dest_height){
+VOID copy_sprite_mask(Sprite *sprite, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *dest, UINT32 dest_pitch, UINT32 dest_height, UINT32 mask)
+{
+    for (UINT32 i = 0; i < sprite->height; i++)
+    {
+        for (UINT32 j = 0; j < sprite->width; j++)
+        {
+            EFI_GRAPHICS_OUTPUT_BLT_PIXEL val = sprite->image[sprite->width * i + j];
+            if (*((UINT32 *)(&val)) ^ mask)
+            {
+                UINT32 yidx = i + sprite->y_pos;
+                UINT32 xidx = j + sprite->x_pos;
+
+                if (xidx >= dest_pitch || yidx >= dest_height)
+                {
                     continue;
                 }
-                int index = yidx * dest_pitch + xidx;
+                UINT32 index = yidx * dest_pitch + xidx;
                 dest[index] = val;
             }
         }
     }
 }
 
+VOID load_asset_image(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, UINT32 src_pitch, Sprite *sprite)
+{
+    bs->AllocatePool(EfiLoaderData, sprite->width * sprite->height * 4, &sprite->image);
+
+    for (UINT32 i = 0; i < sprite->height; i++) {
+        for (UINT32 j = 0; j < sprite->width; j++)
+        {
+            sprite->image[sprite->width * i + j] = source[src_pitch * (i + sprite->img_y_offset) + j + sprite->img_x_offset];
+        }
+    }
+}
 // ================================================
 // Test the game
 // ================================================
@@ -483,6 +494,7 @@ EFI_STATUS test_flaefi(void) {
             asset_arr[width*i + j].Blue = img->data[(width*3+2)*(height-i-1) + 3*j];
             asset_arr[width*i + j].Green = img->data[(width*3+2)*(height-i-1) + 3*j + 1];
             asset_arr[width*i + j].Red = img->data[(width*3+2)*(height-i-1) + 3*j + 2];
+            asset_arr[width*i + j].Reserved = 0xFF;
         }
         
     }
@@ -534,10 +546,29 @@ EFI_STATUS test_flaefi(void) {
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *doublebuffer;
     status = bs->AllocatePool(EfiLoaderData, tw*th*4 *4, &doublebuffer);
 
+    Sprite bird = sprites[ASSET_BIRD];
+    load_asset_image(asset_arr,width, &bird);
+
+    Sprite background = sprites[ASSET_BG];
+    load_asset_image(asset_arr,width, &background);
+
+    Sprite pipe_down = sprites[ASSET_PIPE_DOWN];
+    load_asset_image(asset_arr,width, &pipe_down);
+
+    Sprite pipe_up = sprites[ASSET_PIPE_UP];
+    load_asset_image(asset_arr,width, &pipe_up);
+
+
+
+    bird.x_pos = tw/2 - bird.width/2;
+    bird.y_pos = 200;
+
+    pipe_down.x_pos = 570;
+    pipe_up.x_pos = 570;
+    pipe_up.y_pos = 350;
+    
     UINT32 counter = 0;
     int speed = 5;
-    int birdyoff = 200;
-    int pilxoff = 570;
     int pilspeed = 1;
     while (1)
     {
@@ -556,32 +587,21 @@ EFI_STATUS test_flaefi(void) {
         }
         else
         {
-            copy_buf_mask(asset_arr, framebuffer, xoff, yoff, 0, 0, width, tw,th, tw, th, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
             
-            int upw = 52;
-            int uph = 242;
-            int upxoff = 948;
-            int upyoff = 0;
+            copy_sprite_mask(&background, framebuffer, tw, th, MAGENTA_MASK);
+            copy_sprite_mask(&pipe_up, framebuffer, tw, th, MAGENTA_MASK);
+            copy_sprite_mask(&pipe_down, framebuffer, tw, th, MAGENTA_MASK);
 
-            copy_buf_mask(asset_arr, framebuffer, upxoff, upyoff, pilxoff-pilspeed, 350, width, tw,th, upw, uph, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
-        
-            int dpw = 52;
-            int dph = 270;
-            int dpxoff = 892;
-            int dpyoff = 0;
-
-            copy_buf_mask(asset_arr, framebuffer, dpxoff, dpyoff, pilxoff-pilspeed,0, width, tw,th, dpw, dph, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
-            pilxoff -= pilspeed;
-            if(pilxoff + dpw-6<0){
-                pilxoff = 570;
+            pipe_up.x_pos -= pilspeed;
+            pipe_down.x_pos -= pilspeed;
+            if(pipe_down.x_pos + pipe_down.width-6<0){
+                pipe_down.x_pos = 570;
+                pipe_up.x_pos = 570;
             }
-            int btw = 34;
-            int bth = 32;
-            int bxoff = 816;
-            int byoff = 180;
-            copy_buf_mask(asset_arr, framebuffer, bxoff, byoff, tw / 2 - btw / 2, birdyoff + speed, width, tw, th, btw, bth, (EFI_GRAPHICS_OUTPUT_BLT_PIXEL){0xff, 0x00, 0xff, 0x00});
-            birdyoff += speed;
-        
+
+            copy_sprite_mask(&bird, framebuffer, tw, th, MAGENTA_MASK);
+
+            bird.y_pos += speed;
             if (speed < 10 && counter++ == 4)
             {
                 speed++;
