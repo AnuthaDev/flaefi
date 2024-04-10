@@ -404,6 +404,38 @@ VOID load_asset_image(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, UINT32 src_pitch, S
     }
 }
 
+BOOLEAN is_overlap(Sprite *bird, Sprite *sp2){
+    INT32 sp1left = bird->x_pos + 4;
+    INT32 sp1right = bird->x_pos + bird->width - 4;
+    INT32 sp1top = bird->y_pos + 4;
+    INT32 sp1bottom = bird->y_pos+bird->height - 12;
+
+    // INT32 sp1left = sp1->x_pos;
+    // INT32 sp1right = sp1->x_pos + sp1->width;
+    // INT32 sp1top = sp1->y_pos;
+    // INT32 sp1bottom = sp1->y_pos+sp1->height;
+
+    INT32 sp2left = sp2->x_pos;
+    INT32 sp2right = sp2->x_pos + sp2->width;
+    INT32 sp2top = sp2->y_pos;
+    INT32 sp2bottom = sp2->y_pos+sp2->height;
+
+
+    if(sp1left < sp2right && sp1right > sp2left && sp1top < sp2bottom && sp1bottom > sp2top){
+        return TRUE;
+    }else{
+        return FALSE;
+    }
+}
+
+BOOLEAN is_out_of_bounds(Sprite * bird, INT32 height){
+    if(bird->y_pos + bird->height<0 || bird->y_pos > height){
+        return TRUE;
+    }else{
+        return FALSE;
+    }
+}
+
 // ================================================
 // Test the game
 // ================================================
@@ -489,6 +521,112 @@ EFI_STATUS test_flaefi(void) {
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     bs->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
 
+    EFI_EVENT start_timer;
+    bs->CreateEvent(EVT_TIMER, 0, NULL, NULL, &start_timer);
+    bs->SetTimer(start_timer, TimerPeriodic, 10000000/2);
+
+    EFI_EVENT start_events[2];
+    start_events[1] = start_timer;
+    UINTN startindex = 1;
+
+
+    EFI_INPUT_KEY start_key;
+
+    start_events[0] = cin->WaitForKey;
+
+
+    
+    int fb_width = 576;
+    int fb_height = 512;
+
+
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *framebuffer;
+    status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height *4, &framebuffer);
+
+
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *doublebuffer;
+    status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height*4 *4, &doublebuffer);
+
+
+
+    Sprite bird = sprites[ASSET_BIRD];
+    load_asset_image(asset_arr,width, &bird);
+
+    Sprite background = sprites[ASSET_BG];
+    load_asset_image(asset_arr,width, &background);
+
+    Sprite pipe_down = sprites[ASSET_PIPE_DOWN];
+    load_asset_image(asset_arr,width, &pipe_down);
+
+    Sprite pipe_up = sprites[ASSET_PIPE_UP];
+    load_asset_image(asset_arr,width, &pipe_up);
+
+    Sprite logo = sprites[ASSET_LOGO];
+    load_asset_image(asset_arr, width, &logo);
+
+    Sprite tap = sprites[ASSET_TAP];
+    load_asset_image(asset_arr, width, &tap);
+
+    Sprite game_over = sprites[ASSET_GAME_OVER];
+    load_asset_image(asset_arr, width, &game_over);
+
+
+    bs->FreePool(asset_arr);
+
+    bird.x_pos = fb_width/2 - bird.width/2;
+    bird.y_pos = fb_height/2 - bird.height/2;
+
+    logo.x_pos = fb_width/2 - logo.width/2;
+    logo.y_pos = 50;
+
+    tap.x_pos = fb_width/2 - tap.width/2;
+    tap.y_pos = fb_height-100;
+
+    game_over.x_pos = fb_width/2 - game_over.width/2;
+    game_over.y_pos = 50;
+
+    int parity = 1;
+
+    while (1)
+    {
+        if (startindex == 0)
+        {
+            cin->ReadKeyStroke(cin, &start_key);
+            bs->SetTimer(start_timer, TimerCancel, 0);
+            bs->CloseEvent(start_timer);
+            break;
+        }
+        else
+        {
+            parity = !parity;
+            copy_sprite_mask(&background, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            copy_sprite_mask(&bird, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            copy_sprite_mask(&logo, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+
+            if (parity & 1)
+            {
+                copy_sprite_mask(&tap, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            }
+
+            for (int i = 0; i < fb_height * 2; i++)
+            {
+                for (int j = 0; j < fb_width * 2; j++)
+                {
+                    doublebuffer[fb_width * 2 * i + j] = framebuffer[fb_width * (i / 2) + j / 2];
+                }
+            }
+
+            gop->Blt(gop, doublebuffer, EfiBltBufferToVideo,
+                     0, 0, // Origin BLT BUFFER X,Y
+                     0, 0, // Destination screen X,Y
+                     fb_width * 2, fb_height * 2,
+                     0);
+        }
+        startindex = 0;
+        bs->WaitForEvent(2, start_events, &startindex);
+
+    }
+   
 
 
     EFI_EVENT timer_event;
@@ -514,44 +652,13 @@ EFI_STATUS test_flaefi(void) {
 
 
 
-    
-    int fb_width = 576;
-    int fb_height = 512;
-
-
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *framebuffer;
-    status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height *4, &framebuffer);
-
-    // copyarr_mask(pixelarr, framebuffer, )
-
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL *doublebuffer;
-    status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height*4 *4, &doublebuffer);
-
-    Sprite bird = sprites[ASSET_BIRD];
-    load_asset_image(asset_arr,width, &bird);
-
-    Sprite background = sprites[ASSET_BG];
-    load_asset_image(asset_arr,width, &background);
-
-    Sprite pipe_down = sprites[ASSET_PIPE_DOWN];
-    load_asset_image(asset_arr,width, &pipe_down);
-
-    Sprite pipe_up = sprites[ASSET_PIPE_UP];
-    load_asset_image(asset_arr,width, &pipe_up);
-
-    bs->FreePool(asset_arr);
-
-
-
-    bird.x_pos = fb_width/2 - bird.width/2;
-    bird.y_pos = 200;
 
     pipe_down.x_pos = 570;
     pipe_up.x_pos = 570;
     pipe_up.y_pos = 350;
     
     UINT32 counter = 0;
-    int speed = 5;
+    int speed = -3;
     int pilspeed = 1;
     while (1)
     {
@@ -559,6 +666,11 @@ EFI_STATUS test_flaefi(void) {
         if (index == 0)
         {
             cin->ReadKeyStroke(cin, &key);
+
+            if(key.ScanCode == SCANCODE_ESC){
+                return EFI_SUCCESS;
+            }
+            
             if (speed >= 0)
             {
                 speed = -3;
@@ -570,26 +682,15 @@ EFI_STATUS test_flaefi(void) {
         }
         else
         {
-            
+  
+
             copy_sprite_mask(&background, framebuffer, fb_width, fb_height, MAGENTA_MASK);
             copy_sprite_mask(&pipe_up, framebuffer, fb_width, fb_height, MAGENTA_MASK);
             copy_sprite_mask(&pipe_down, framebuffer, fb_width, fb_height, MAGENTA_MASK);
 
-            pipe_up.x_pos -= pilspeed;
-            pipe_down.x_pos -= pilspeed;
-            if(pipe_down.x_pos + pipe_down.width-6<0){
-                pipe_down.x_pos = 570;
-                pipe_up.x_pos = 570;
-            }
+
 
             copy_sprite_mask(&bird, framebuffer, fb_width, fb_height, MAGENTA_MASK);
-
-            bird.y_pos += speed;
-            if (speed < 10 && counter++ == 4)
-            {
-                speed++;
-                counter = 0;
-            }
 
             for (int i = 0; i < fb_height * 2; i++)
             {
@@ -604,6 +705,45 @@ EFI_STATUS test_flaefi(void) {
                      0, 0, // Destination screen X,Y
                      fb_width * 2, fb_height * 2,
                      0);
+                     
+            if (is_overlap(&bird, &pipe_down) || is_overlap(&bird, &pipe_up) || is_out_of_bounds(&bird, fb_height))
+            {
+                copy_sprite_mask(&game_over, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+
+                for (int i = 0; i < fb_height * 2; i++)
+                {
+                    for (int j = 0; j < fb_width * 2; j++)
+                    {
+                        doublebuffer[fb_width * 2 * i + j] = framebuffer[fb_width * (i / 2) + j / 2];
+                    }
+                }
+
+                gop->Blt(gop, doublebuffer, EfiBltBufferToVideo,
+                         0, 0, // Origin BLT BUFFER X,Y
+                         0, 0, // Destination screen X,Y
+                         fb_width * 2, fb_height * 2,
+                         0);
+                get_key();
+                return EFI_SUCCESS;
+
+            }
+
+            pipe_up.x_pos -= pilspeed;
+            pipe_down.x_pos -= pilspeed;
+            if(pipe_down.x_pos + pipe_down.width-6<0){
+                pipe_down.x_pos = 570;
+                pipe_up.x_pos = 570;
+            }
+
+
+            bird.y_pos += speed;
+            if (speed < 10 && counter++ == 4)
+            {
+                speed++;
+                counter = 0;
+            }
+
+
         }
     }
 
