@@ -30,7 +30,6 @@ LDFLAGS = \
 	-fuse-ld=lld-link \
 	-Wl,-subsystem:efi_application \
 	-Wl,-entry:efi_main \
-	-Wl,--lto-O3
 
 CFLAGS = \
 	-std=c17 \
@@ -41,7 +40,6 @@ CFLAGS = \
 	-mno-red-zone \
 	-ffreestanding \
 	-ggdb \
-	-flto \
 	-O3
 
 
