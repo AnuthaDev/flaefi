@@ -55,5 +55,5 @@ $(TARGET): $(OBJS)
 -include $(DEPENDS)
 
 clean:
-	rm -rf $(TARGET) *.efi *.o *.d
+	rm -f $(TARGET) *.efi *.o *.d *.pdb
 
