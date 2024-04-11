@@ -64,97 +64,6 @@ EFI_INPUT_KEY get_key(void) {
 }
 
 // ====================
-// Set Text Mode
-// ====================
-EFI_STATUS set_text_mode(void) {
-    // Overall screen loop
-    while (true) {
-        cout->ClearScreen(cout);
-
-        // Write String
-        cout->OutputString(cout, u"Text mode information:\r\n");
-        UINTN max_cols = 0, max_rows = 0;
-
-        // Get current text mode's column and row counts
-        cout->QueryMode(cout, cout->Mode->Mode, &max_cols, &max_rows);
-
-        printf(u"Max Mode: %d\r\n"
-               u"Current Mode: %d\r\n"
-               u"Attribute: %x\r\n" 
-               u"CursorColumn: %d\r\n"
-               u"CursorRow: %d\r\n"
-               u"CursorVisible: %d\r\n"
-               u"Columns: %d\r\n"
-               u"Rows: %d\r\n\r\n",
-               cout->Mode->MaxMode,
-               cout->Mode->Mode,
-               cout->Mode->Attribute,
-               cout->Mode->CursorColumn,
-               cout->Mode->CursorRow,
-               cout->Mode->CursorVisible,
-               max_cols,
-               max_rows);
-
-        cout->OutputString(cout, u"Available text modes:\r\n");
-
-        // Print other text mode infos
-        const INT32 max = cout->Mode->MaxMode;
-        for (INT32 i = 0; i < max; i++) {
-            cout->QueryMode(cout, i, &max_cols, &max_rows);
-            printf(u"Mode #: %d, %dx%d\r\n", i, max_cols, max_rows);
-        }
-
-        // Get number from user
-        while (true) {
-            static UINTN current_mode = 0;
-            current_mode = cout->Mode->Mode;
-
-            for (UINTN i = 0; i < 79; i++) printf(u" ");
-            printf(u"\rSelect Text Mode # (0-%d): %d", max, current_mode);
-
-            // Move cursor left by 1, to overwrite the mode #
-            cout->SetCursorPosition(cout, cout->Mode->CursorColumn-1, cout->Mode->CursorRow);
-
-            EFI_INPUT_KEY key = get_key();
-
-            // Get key info
-            CHAR16 cbuf[2];
-            cbuf[0] = key.UnicodeChar;
-            cbuf[1] = u'\0';
-            //printf(u"Scancode: %x, Unicode Char: %s\r", key.ScanCode, cbuf);
-
-            // Process keystroke
-            printf(u"%s ", cbuf);
-
-            if (key.ScanCode == SCANCODE_ESC) {
-                // Go back to main menu
-                return EFI_SUCCESS;
-            }
-
-            // Choose text mode & redraw screen
-            current_mode = key.UnicodeChar - u'0';
-            EFI_STATUS status = cout->SetMode(cout, current_mode);
-            if (EFI_ERROR(status)) {
-                // Handle errors
-                if (status == EFI_DEVICE_ERROR) { 
-                    eprintf(u"ERROR: %x; Device Error", status);
-                } else if (status == EFI_UNSUPPORTED) {
-                    eprintf(u"ERROR: %x; Mode # is invalid", status);
-                }
-                eprintf(u"\r\nPress any key to select again", status);
-                get_key();
-
-            } 
-
-            // Set new mode, redraw screen from outer loop
-            break;
-        }
-    }
-
-    return EFI_SUCCESS;
-}
-
-// ====================
 // Set Graphics Mode
 // ====================
 EFI_STATUS set_graphics_mode(void) {
@@ -944,14 +853,12 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         get_key();
         // Menu text on screen
         const CHAR16 *menu_choices[] = {
-            u"Set Text Mode",
             u"Set Graphics Mode",
             u"Test flaEFI"
         };
 
         // Functions to call for each menu option
         EFI_STATUS (*menu_funcs[])(void) = {
-            set_text_mode,
             set_graphics_mode,
             test_flaefi
         };
