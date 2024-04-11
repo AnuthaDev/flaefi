@@ -428,12 +428,30 @@ BOOLEAN is_overlap(Sprite *bird, Sprite *sp2){
     }
 }
 
+BOOLEAN is_collide(Sprite *bird, Obstacle obs){
+    obs.pipe_down.x_pos = obs.x_pos;
+    obs.pipe_down.y_pos = obs.y_offset;
+    obs.pipe_up.y_pos = obs.y_offset + 380;
+    obs.pipe_up.x_pos = obs.x_pos;
+
+    return is_overlap(bird, &obs.pipe_down) || is_overlap(bird, &obs.pipe_up);
+}
+
 BOOLEAN is_out_of_bounds(Sprite * bird, INT32 height){
     if(bird->y_pos + bird->height<0 || bird->y_pos > height){
         return TRUE;
     }else{
         return FALSE;
     }
+}
+
+VOID render_obstacle(Obstacle obs, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *fb, UINT32 dest_pitch, UINT32 dest_height, UINT32 mask){
+    obs.pipe_up.y_pos = obs.y_offset + 380;
+    obs.pipe_up.x_pos = obs.x_pos;
+    obs.pipe_down.x_pos = obs.x_pos;
+    obs.pipe_down.y_pos = obs.y_offset;
+    copy_sprite_mask(&obs.pipe_down, fb, dest_pitch, dest_height, mask);
+    copy_sprite_mask(&obs.pipe_up, fb, dest_pitch, dest_height, mask);
 }
 
 // ================================================
@@ -534,7 +552,7 @@ EFI_STATUS test_flaefi(void) {
 
     start_events[0] = cin->WaitForKey;
 
-
+    UINT8 score = 0;
     
     int fb_width = 576;
     int fb_height = 512;
@@ -547,6 +565,14 @@ EFI_STATUS test_flaefi(void) {
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *doublebuffer;
     status = bs->AllocatePool(EfiLoaderData, fb_width*fb_height*4 *4, &doublebuffer);
 
+    Sprite digits[10];
+    for (int i = 0; i <10; i++)
+    {
+        digits[i] = sprites[i + ASSET_ZERO];
+        load_asset_image(asset_arr, width, &digits[i]);
+        digits[i].x_pos = fb_width/2 - digits[i].width/2;
+        digits[i].y_pos = 50;
+    }
 
     Sprite bird_1 = sprites[ASSET_BIRD_1];
     load_asset_image(asset_arr,width, &bird_1);
@@ -577,6 +603,15 @@ EFI_STATUS test_flaefi(void) {
 
     Sprite game_over = sprites[ASSET_GAME_OVER];
     load_asset_image(asset_arr, width, &game_over);
+
+    Sprite digit_1 = sprites[ASSET_ONE];
+    load_asset_image(asset_arr, width, &digit_1);
+
+    Obstacle obs1 = {.pipe_down = pipe_down, .pipe_up = pipe_up, .x_pos = 570, .y_offset = -100, .can_score = TRUE};
+
+    Obstacle obs2 = {.pipe_down = pipe_down, .pipe_up = pipe_up, .x_pos = 770, .y_offset = 0, .can_score = TRUE};
+
+    Obstacle obs3 = {.pipe_down = pipe_down, .pipe_up = pipe_up, .x_pos = 970, .y_offset = -50, .can_score = TRUE};
 
 
     bs->FreePool(asset_arr);
@@ -662,9 +697,7 @@ EFI_STATUS test_flaefi(void) {
 
 
 
-    pipe_down.x_pos = 570;
-    pipe_up.x_pos = 570;
-    pipe_up.y_pos = 350;
+
     
     UINT32 counter = 0;
     int speed = -3;
@@ -696,11 +729,14 @@ EFI_STATUS test_flaefi(void) {
   
 
             copy_sprite_mask(&background, framebuffer, fb_width, fb_height, MAGENTA_MASK);
-            copy_sprite_mask(&pipe_up, framebuffer, fb_width, fb_height, MAGENTA_MASK);
-            copy_sprite_mask(&pipe_down, framebuffer, fb_width, fb_height, MAGENTA_MASK);
-
+            // copy_sprite_mask(&pipe_up, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            // copy_sprite_mask(&pipe_down, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            render_obstacle(obs1, framebuffer,fb_width, fb_height, MAGENTA_MASK );
+            render_obstacle(obs2, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            render_obstacle(obs3, framebuffer, fb_width, fb_height, MAGENTA_MASK);
 
             copy_sprite_mask(&bird, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            copy_sprite_mask(&digits[score], framebuffer, fb_width, fb_height, MAGENTA_MASK);
 
             for (int i = 0; i < fb_height * 2; i++)
             {
@@ -716,7 +752,7 @@ EFI_STATUS test_flaefi(void) {
                      fb_width * 2, fb_height * 2,
                      0);
                      
-            if (is_overlap(&bird, &pipe_down) || is_overlap(&bird, &pipe_up) || is_out_of_bounds(&bird, fb_height))
+            if (is_collide(&bird, obs1) || is_collide(&bird, obs2) || is_collide(&bird, obs3) || is_out_of_bounds(&bird, fb_height))
             {
                 copy_sprite_mask(&game_over, framebuffer, fb_width, fb_height, MAGENTA_MASK);
 
@@ -738,12 +774,42 @@ EFI_STATUS test_flaefi(void) {
 
             }
 
-            pipe_up.x_pos -= pilspeed;
-            pipe_down.x_pos -= pilspeed;
-            if(pipe_down.x_pos + pipe_down.width-6<0){
-                pipe_down.x_pos = 570;
-                pipe_up.x_pos = 570;
+            obs1.x_pos -= pilspeed;
+            obs2.x_pos -= pilspeed;
+            obs3.x_pos -= pilspeed;
+
+            if (obs1.x_pos + obs1.pipe_down.width - 6 < 0)
+            {
+                obs1.x_pos = 570;
+                obs1.can_score = TRUE;
             }
+            else if (obs2.x_pos + obs2.pipe_down.width - 6 < 0)
+            {
+                obs2.x_pos = 570;
+                obs2.can_score = TRUE;
+            }
+            else if (obs3.x_pos + obs3.pipe_down.width - 6 < 0)
+            {
+                obs3.x_pos = 570;
+                obs3.can_score = TRUE;
+            }
+
+            
+            if(obs1.x_pos < fb_width/2 && obs1.can_score){
+                score++;
+                obs1.can_score = FALSE;
+            }
+            if(obs2.x_pos < fb_width/2 && obs2.can_score){
+                score++;
+                obs2.can_score = FALSE;
+            }
+            if(obs3.x_pos < fb_width/2 && obs3.can_score){
+                score++;
+                obs3.can_score = FALSE;
+            }
+
+            // printf(u"\r%u", score);
+
 
 
             bird.y_pos += speed;

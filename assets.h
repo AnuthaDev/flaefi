@@ -14,8 +14,25 @@ typedef struct Sprite {
 	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *image;
 } Sprite;
 
+typedef struct Obstacle {
+	Sprite pipe_up;
+	Sprite pipe_down;
+	INT16 x_pos;
+	INT16 y_offset;
+	BOOLEAN can_score;
+} Obstacle;
 
 enum ASSETS {
+	ASSET_ZERO,
+	ASSET_ONE,
+	ASSET_TWO,
+	ASSET_THREE,
+	ASSET_FOUR,
+	ASSET_FIVE,
+	ASSET_SIX,
+	ASSET_SEVEN,
+	ASSET_EIGHT,
+	ASSET_NINE,
 	ASSET_BG,
 	ASSET_BIRD_1,
 	ASSET_BIRD_2,
