@@ -16,3 +16,9 @@ For generating the bootable EFI executable, enter
 While inside the repo and it should generate a file called `BOOTX64.EFI`
 
 To test it on a PC, put the `BOOTX64.EFI` and `sprites.bmp` inside `EFI/BOOT` directory of a FAT32 partitioned USB drive.
+
+
+## Demo
+Here is a demo of flaEFI running on a UEFI laptop
+
+[![flaEFI running on laptop](https://img.youtube.com/vi/QMowro83PfE/0.jpg)](https://www.youtube.com/watch?v=QMowro83PfE)
