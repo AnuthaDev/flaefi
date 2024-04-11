@@ -370,26 +370,78 @@ EFI_STATUS set_graphics_mode(void) {
 }
 
 
-VOID copy_sprite_mask(Sprite *sprite, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *dest, UINT32 dest_pitch, UINT32 dest_height, UINT32 mask)
+VOID copy_sprite_mask(Sprite *sprite, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *dest, INT16 dest_pitch, INT16 dest_height, UINT32 mask)
 {
-    for (UINT32 i = 0; i < sprite->height; i++)
-    {
-        for (UINT32 j = 0; j < sprite->width; j++)
-        {
-            EFI_GRAPHICS_OUTPUT_BLT_PIXEL val = sprite->image[sprite->width * i + j];
-            if (*((UINT32 *)(&val)) ^ mask)
-            {
-                UINT32 yidx = i + sprite->y_pos;
-                UINT32 xidx = j + sprite->x_pos;
+    INT16 dst_x1 = sprite->x_pos;
+    INT16 dst_y1 = sprite->y_pos;
+    INT16 dst_x2 = sprite->x_pos + sprite->width - 1;
+    INT16 dst_y2 = sprite->y_pos + sprite->height - 1;
+    INT16 src_x1 = 0;
+    INT16 src_y1 = 0;
 
-                if (xidx < dest_pitch && yidx < dest_height)
-                {
-                    UINT32 index = yidx * dest_pitch + xidx;
-                    dest[index] = val;
-                }
-            }
-        }
+    if (dst_x1 >= dest_pitch)
+        return;
+    if (dst_x2 < 0)
+        return;
+    if (dst_y1 >= dest_height)
+        return;
+    if (dst_y2 < 0)
+        return;
+
+    if (dst_x1 < 0)
+    {
+        src_x1 -= dst_x1;
+        dst_x1 = 0;
     }
+    if (dst_y1 < 0)
+    {
+        src_y1 -= dst_y1;
+        dst_y1 = 0;
+    }
+    if (dst_x2 >= dest_pitch)
+        dst_x2 = dest_pitch - 1;
+    if (dst_y2 >= dest_height)
+        dst_y2 = dest_height - 1;
+
+    INT16 clipped_width = dst_x2 - dst_x1 + 1;
+    INT16 dst_next_row = dest_pitch - clipped_width;
+    INT16 src_next_row = sprite->width - clipped_width;
+
+    UINT32 *dst_pixel = dest + dst_y1 * dest_pitch + dst_x1;
+    UINT32 *src_pixel = sprite->image + src_y1 * sprite->width + src_x1;
+
+    for (INT16 y = dst_y1; y <= dst_y2; y++)
+    {
+        for(INT16 i = 0; i<clipped_width; i++)
+        {
+            UINT32 src_color = *src_pixel;
+            UINT32 dst_color = *dst_pixel;
+            *dst_pixel = src_color != mask ? src_color : dst_color;
+            src_pixel++;
+            dst_pixel++;
+        }
+        dst_pixel += dst_next_row;
+        src_pixel += src_next_row;
+    }
+
+    // for (UINT32 i = 0; i < sprite->height; i++)
+    // {
+    //     for (UINT32 j = 0; j < sprite->width; j++)
+    //     {
+    //         EFI_GRAPHICS_OUTPUT_BLT_PIXEL val = sprite->image[sprite->width * i + j];
+    //         if (*((UINT32 *)(&val)) ^ mask)
+    //         {
+    //             UINT32 yidx = i + sprite->y_pos;
+    //             UINT32 xidx = j + sprite->x_pos;
+
+    //             if (xidx < dest_pitch && yidx < dest_height)
+    //             {
+    //                 UINT32 index = yidx * dest_pitch + xidx;
+    //                 dest[index] = val;
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 VOID load_asset_image(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, UINT32 src_pitch, Sprite *sprite)
@@ -405,20 +457,20 @@ VOID load_asset_image(EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, UINT32 src_pitch, S
 }
 
 BOOLEAN is_overlap(Sprite *bird, Sprite *sp2){
-    INT32 sp1left = bird->x_pos + 4;
-    INT32 sp1right = bird->x_pos + bird->width - 4;
-    INT32 sp1top = bird->y_pos + 4;
-    INT32 sp1bottom = bird->y_pos+bird->height - 12;
+    INT16 sp1left = bird->x_pos + 4;
+    INT16 sp1right = bird->x_pos + bird->width - 4;
+    INT16 sp1top = bird->y_pos + 4;
+    INT16 sp1bottom = bird->y_pos+bird->height - 12;
 
     // INT32 sp1left = sp1->x_pos;
     // INT32 sp1right = sp1->x_pos + sp1->width;
     // INT32 sp1top = sp1->y_pos;
     // INT32 sp1bottom = sp1->y_pos+sp1->height;
 
-    INT32 sp2left = sp2->x_pos;
-    INT32 sp2right = sp2->x_pos + sp2->width;
-    INT32 sp2top = sp2->y_pos;
-    INT32 sp2bottom = sp2->y_pos+sp2->height;
+    INT16 sp2left = sp2->x_pos;
+    INT16 sp2right = sp2->x_pos + sp2->width;
+    INT16 sp2top = sp2->y_pos;
+    INT16 sp2bottom = sp2->y_pos+sp2->height;
 
 
     if(sp1left < sp2right && sp1right > sp2left && sp1top < sp2bottom && sp1bottom > sp2top){
@@ -428,16 +480,16 @@ BOOLEAN is_overlap(Sprite *bird, Sprite *sp2){
     }
 }
 
-BOOLEAN is_collide(Sprite *bird, Obstacle obs){
-    obs.pipe_down.x_pos = obs.x_pos;
-    obs.pipe_down.y_pos = obs.y_offset;
-    obs.pipe_up.y_pos = obs.y_offset + 380;
-    obs.pipe_up.x_pos = obs.x_pos;
+BOOLEAN is_collide(Sprite *bird, Obstacle *obs){
+    obs->pipe_down.x_pos = obs->x_pos;
+    obs->pipe_down.y_pos = obs->y_offset;
+    obs->pipe_up.y_pos = obs->y_offset + 380;
+    obs->pipe_up.x_pos = obs->x_pos;
 
-    return is_overlap(bird, &obs.pipe_down) || is_overlap(bird, &obs.pipe_up);
+    return is_overlap(bird, &obs->pipe_down) || is_overlap(bird, &obs->pipe_up);
 }
 
-BOOLEAN is_out_of_bounds(Sprite * bird, INT32 height){
+BOOLEAN is_out_of_bounds(Sprite * bird, INT16 height){
     if(bird->y_pos + bird->height<0 || bird->y_pos > height){
         return TRUE;
     }else{
@@ -445,13 +497,13 @@ BOOLEAN is_out_of_bounds(Sprite * bird, INT32 height){
     }
 }
 
-VOID render_obstacle(Obstacle obs, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *fb, UINT32 dest_pitch, UINT32 dest_height, UINT32 mask){
-    obs.pipe_up.y_pos = obs.y_offset + 380;
-    obs.pipe_up.x_pos = obs.x_pos;
-    obs.pipe_down.x_pos = obs.x_pos;
-    obs.pipe_down.y_pos = obs.y_offset;
-    copy_sprite_mask(&obs.pipe_down, fb, dest_pitch, dest_height, mask);
-    copy_sprite_mask(&obs.pipe_up, fb, dest_pitch, dest_height, mask);
+VOID render_obstacle(Obstacle *obs, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *fb, INT16 dest_pitch, INT16 dest_height, UINT32 mask){
+    obs->pipe_up.y_pos = obs->y_offset + 380;
+    obs->pipe_up.x_pos = obs->x_pos;
+    obs->pipe_down.x_pos = obs->x_pos;
+    obs->pipe_down.y_pos = obs->y_offset;
+    copy_sprite_mask(&obs->pipe_down, fb, dest_pitch, dest_height, mask);
+    copy_sprite_mask(&obs->pipe_up, fb, dest_pitch, dest_height, mask);
 }
 
 // ================================================
@@ -554,8 +606,8 @@ EFI_STATUS test_flaefi(void) {
 
     UINT8 score = 0;
     
-    int fb_width = 576;
-    int fb_height = 512;
+    INT16 fb_width = 576;
+    INT16 fb_height = 512;
 
 
     EFI_GRAPHICS_OUTPUT_BLT_PIXEL *framebuffer;
@@ -697,7 +749,6 @@ EFI_STATUS test_flaefi(void) {
 
 
 
-
     
     UINT32 counter = 0;
     int speed = -3;
@@ -731,9 +782,9 @@ EFI_STATUS test_flaefi(void) {
             copy_sprite_mask(&background, framebuffer, fb_width, fb_height, MAGENTA_MASK);
             // copy_sprite_mask(&pipe_up, framebuffer, fb_width, fb_height, MAGENTA_MASK);
             // copy_sprite_mask(&pipe_down, framebuffer, fb_width, fb_height, MAGENTA_MASK);
-            render_obstacle(obs1, framebuffer,fb_width, fb_height, MAGENTA_MASK );
-            render_obstacle(obs2, framebuffer, fb_width, fb_height, MAGENTA_MASK);
-            render_obstacle(obs3, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            render_obstacle(&obs1, framebuffer,fb_width, fb_height, MAGENTA_MASK );
+            render_obstacle(&obs2, framebuffer, fb_width, fb_height, MAGENTA_MASK);
+            render_obstacle(&obs3, framebuffer, fb_width, fb_height, MAGENTA_MASK);
 
             copy_sprite_mask(&bird, framebuffer, fb_width, fb_height, MAGENTA_MASK);
             copy_sprite_mask(&digits[score], framebuffer, fb_width, fb_height, MAGENTA_MASK);
@@ -752,7 +803,7 @@ EFI_STATUS test_flaefi(void) {
                      fb_width * 2, fb_height * 2,
                      0);
                      
-            if (is_collide(&bird, obs1) || is_collide(&bird, obs2) || is_collide(&bird, obs3) || is_out_of_bounds(&bird, fb_height))
+            if (is_collide(&bird, &obs1) || is_collide(&bird, &obs2) || is_collide(&bird, &obs3) || is_out_of_bounds(&bird, fb_height))
             {
                 copy_sprite_mask(&game_over, framebuffer, fb_width, fb_height, MAGENTA_MASK);
 

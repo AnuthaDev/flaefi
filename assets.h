@@ -5,12 +5,12 @@
 
 
 typedef struct Sprite {
-	UINT16 width;
-	UINT16 height;
+	INT16 width;
+	INT16 height;
 	INT16 x_pos;
 	INT16 y_pos;
-	UINT16 img_x_offset;
-	UINT16 img_y_offset;
+	INT16 img_x_offset;
+	INT16 img_y_offset;
 	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *image;
 } Sprite;
 
